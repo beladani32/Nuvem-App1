@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Painel do Aplicativo</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f8f9fa;
+        color: #333;
+        padding: 40px;
+      }
+      h1 {
+        color: #0077cc;
+      }
+      pre {
+        background: #fff;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🎨 Aplicativo Layout</h1>
+    <p>Seu aplicativo está conectado com sucesso à Nuvemshop!</p>
+    <p>Use esta interface para visualizar suas conexões e dados.</p>
+    <hr />
+    <div id="data"></div>
+    <script>
+      fetch("/tokens")
+        .then((r) => r.json())
+        .then((data) => {
+          document.getElementById("data").innerHTML =
+            "<h2>Tokens salvos:</h2><pre>" + JSON.stringify(data, null, 2) + "</pre>";
+        });
+    </script>
+  </body>
+</html>
