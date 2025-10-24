@@ -19,9 +19,10 @@ app.get("/", (req, res) => {
 // ✅ Callback OAuth — troca o código pelo token e salva no banco
 app.get("/oauth/callback", async (req, res) => {
   console.log("🔄 Callback recebido:", req.query);
-  const { code } = req.query;
+  const { code, store_id } = req.query;
 
   try {
+    // Troca o code pelo token
     const tokenRes = await axios.post(AUTH_URL, {
       client_id: CLIENT_ID,
       client_secret: CLIENT_SECRET,
@@ -32,15 +33,19 @@ app.get("/oauth/callback", async (req, res) => {
     const data = tokenRes.data;
     console.log("🔐 Token recebido:", data);
 
-    if (!data.access_token || !data.user_id) {
-      return res.status(400).send("❌ Falha ao obter token da Nuvemshop");
+    // ⚙️ Garantir o ID da loja
+    const storeId = store_id || data.user_id || "6822200"; // fallback manual
+
+    if (!data.access_token || !storeId) {
+      return res.status(400).send("❌ Falha ao obter token da Nuvemshop (store_id ausente)");
     }
 
-    await tokenService.saveToken(data.user_id, data);
+    await tokenService.saveToken(storeId, data);
+    console.log(`✅ Token salvo com sucesso para a loja ${storeId}`);
 
     res.send(`
       <h2>✅ App conectado com sucesso!</h2>
-      <p>Loja: ${data.user_id}</p>
+      <p>Loja: ${storeId}</p>
       <pre>${JSON.stringify(data, null, 2)}</pre>
       <a href="/dashboard">Acessar painel</a>
     `);
