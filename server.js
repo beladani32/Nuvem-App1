@@ -19,7 +19,7 @@ app.get("/", (req, res) => {
 // ✅ Callback OAuth — troca o código pelo token e salva no banco
 app.get("/oauth/callback", async (req, res) => {
   console.log("🔄 Callback recebido:", req.query);
-  const { code, store_id } = req.query;
+  const { code } = req.query; // Ignoramos o store_id da URL, ele não é confiável
 
   try {
     const tokenRes = await axios.post(AUTH_URL, {
@@ -32,10 +32,11 @@ app.get("/oauth/callback", async (req, res) => {
     const data = tokenRes.data;
     console.log("🔐 Token recebido:", data);
 
-    const storeId = store_id || data.user_id || "6822200";
+    // ❗️ CORREÇÃO: Usar SEMPRE o user_id do token, que é o ID canônico e correto.
+    const storeId = String(data.user_id);
 
     if (!data.access_token || !storeId) {
-      return res.status(400).send("❌ Falha ao obter token da Nuvemshop (store_id ausente)");
+      return res.status(400).send("❌ Falha ao obter token ou ID da loja da Nuvemshop.");
     }
 
     await tokenService.saveToken(storeId, data);
@@ -69,7 +70,9 @@ app.get("/test-api/:userId", async (req, res) => {
   const { userId } = req.params;
   const token = await tokenService.getToken(userId);
 
-  if (!token) return res.status(404).send("Token não encontrado para esta loja.");
+  if (!token) {
+    return res.status(404).send(`Token não encontrado para esta loja.`);
+  }
 
   try {
     const resp = await axios.get(
