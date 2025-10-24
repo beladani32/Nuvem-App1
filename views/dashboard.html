@@ -34,12 +34,10 @@
             const container = document.getElementById('products-container');
             const loading = document.getElementById('loading');
             
-            // Mostra o 'Carregando...' e limpa a lista antiga
             loading.style.display = 'block';
             container.innerHTML = '';
 
             try {
-                // ⚙️ Usamos o ID da loja fixo por enquanto
                 const storeId = '6822200';
                 const response = await fetch(`/test-api/${storeId}`);
 
@@ -55,18 +53,17 @@
                     return;
                 }
                 
-                // Cria e insere a lista de produtos na página
                 products.forEach(product => {
                     const item = document.createElement('div');
                     item.className = 'product-item';
                     
                     const name = document.createElement('span');
                     name.className = 'product-name';
-                    name.textContent = product.name[0].text; // Ajustado para a estrutura da API
+                    // ✨ CORREÇÃO APLICADA AQUI ✨
+                    name.textContent = product.name.pt;
                     
                     const price = document.createElement('span');
                     price.className = 'product-price';
-                    // Pega o primeiro preço disponível (variante)
                     price.textContent = `R$ ${product.variants[0].price}`;
                     
                     item.appendChild(name);
