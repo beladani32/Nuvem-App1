@@ -1,40 +1,87 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-  <head>
+<head>
     <meta charset="UTF-8" />
-    <title>Painel do Aplicativo</title>
+    <title>Dashboard de Produtos</title>
     <style>
-      body {
-        font-family: Arial, sans-serif;
-        background: #f8f9fa;
-        color: #333;
-        padding: 40px;
-      }
-      h1 {
-        color: #0077cc;
-      }
-      pre {
-        background: #fff;
-        padding: 15px;
-        border-radius: 8px;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-        overflow-x: auto;
-      }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f0f2f5; color: #1c1e21; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 40px auto; padding: 20px; background: #fff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
+        h1 { color: #007bff; border-bottom: 2px solid #f0f2f5; padding-bottom: 10px; }
+        button { background-color: #007bff; color: white; border: none; padding: 12px 20px; border-radius: 6px; font-size: 16px; cursor: pointer; transition: background-color 0.2s; }
+        button:hover { background-color: #0056b3; }
+        #products-container { margin-top: 20px; }
+        .product-item { display: flex; align-items: center; justify-content: space-between; padding: 10px; border-bottom: 1px solid #ddd; }
+        .product-item:last-child { border-bottom: none; }
+        .product-name { font-weight: 500; }
+        .product-price { color: #4CAF50; font-weight: bold; }
+        #loading { display: none; margin-top: 15px; color: #555; }
     </style>
-  </head>
-  <body>
-    <h1>🎨 Aplicativo Layout</h1>
-    <p>Seu aplicativo está conectado com sucesso à Nuvemshop!</p>
-    <p>Use esta interface para visualizar suas conexões e dados.</p>
-    <hr />
-    <div id="data"></div>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🛍️ Produtos da Loja</h1>
+        <p>Clique no botão abaixo para carregar os produtos diretamente da sua loja Nuvemshop.</p>
+        
+        <button onclick="loadProducts()">Carregar Produtos</button>
+        
+        <div id="loading">Carregando...</div>
+        <div id="products-container"></div>
+    </div>
+
     <script>
-      fetch("/tokens")
-        .then((r) => r.json())
-        .then((data) => {
-          document.getElementById("data").innerHTML =
-            "<h2>Tokens salvos:</h2><pre>" + JSON.stringify(data, null, 2) + "</pre>";
-        });
+        async function loadProducts() {
+            const container = document.getElementById('products-container');
+            const loading = document.getElementById('loading');
+            
+            // Mostra o 'Carregando...' e limpa a lista antiga
+            loading.style.display = 'block';
+            container.innerHTML = '';
+
+            try {
+                // ⚙️ Usamos o ID da loja fixo por enquanto
+                const storeId = '6822200';
+                const response = await fetch(`/test-api/${storeId}`);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Erro na API: ${response.status} ${response.statusText} - ${errorText}`);
+                }
+
+                const products = await response.json();
+
+                if (products.length === 0) {
+                    container.innerHTML = '<p>Nenhum produto encontrado na loja.</p>';
+                    return;
+                }
+                
+                // Cria e insere a lista de produtos na página
+                products.forEach(product => {
+                    const item = document.createElement('div');
+                    item.className = 'product-item';
+                    
+                    const name = document.createElement('span');
+                    name.className = 'product-name';
+                    name.textContent = product.name[0].text; // Ajustado para a estrutura da API
+                    
+                    const price = document.createElement('span');
+                    price.className = 'product-price';
+                    // Pega o primeiro preço disponível (variante)
+                    price.textContent = `R$ ${product.variants[0].price}`;
+                    
+                    item.appendChild(name);
+                    item.appendChild(price);
+                    container.appendChild(item);
+                });
+
+            } catch (error) {
+                console.error('Falha ao carregar produtos:', error);
+                container.innerHTML = `<p style="color: red;">Ocorreu um erro ao carregar os produtos. Detalhes: ${error.message}</p>`;
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
     </script>
-  </body>
+
+</body>
 </html>
