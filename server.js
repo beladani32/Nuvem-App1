@@ -2,14 +2,12 @@ import express from "express";
 import axios from "axios";
 import dotenv from "dotenv";
 import tokenService from "./services/tokenService.js";
-import pkg from "pg";
 
 dotenv.config();
 const app = express();
 app.use(express.json());
 app.use(express.static("views"));
 
-const { Client } = pkg;
 const { CLIENT_ID, CLIENT_SECRET } = process.env;
 const AUTH_URL = "https://www.nuvemshop.com.br/apps/authorize/token";
 
@@ -116,51 +114,6 @@ app.post("/refresh/:userId", async (req, res) => {
   }
 });
 
-// 🕵️‍♂️ Função de diagnóstico do banco de dados
-async function checkDatabase() {
-  // Atraso de 5 segundos para garantir que a tabela foi criada pelo tokenService
-  await new Promise(resolve => setTimeout(resolve, 5000));
-  
-  console.log("\n\n--- INICIANDO DIAGNÓSTICO DO BANCO DE DADOS ---");
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
-  });
-
-  try {
-    await client.connect();
-    console.log("✅ Conectado ao banco para diagnóstico!");
-
-    const res = await client.query("SELECT * FROM tokens ORDER BY created_at DESC");
-    if (res.rows.length === 0) {
-      console.log("⚠️ Nenhum token encontrado na tabela 'tokens'.");
-    } else {
-      console.log("🔍 Tokens encontrados:");
-      res.rows.forEach(row => {
-        console.log(`🛍️ Loja ${row.user_id} | Token: ${row.access_token.substring(0, 10)}... | Criado em: ${row.created_at}`);
-      });
-    }
-
-    console.log("\n📊 Verificando duplicatas...");
-    const dup = await client.query("SELECT user_id, COUNT(*) FROM tokens GROUP BY user_id HAVING COUNT(*) > 1");
-    if (dup.rows.length > 0) {
-      console.log("⚠️ Duplicatas encontradas:", dup.rows);
-    } else {
-      console.log("✅ Nenhuma duplicata encontrada.");
-    }
-
-  } catch (err) {
-    console.error("❌ Erro no script de diagnóstico:", err);
-  } finally {
-    await client.end();
-    console.log("--- FIM DO DIAGNÓSTICO ---\n");
-  }
-}
-
-// ✅ Inicia o servidor e executa o diagnóstico
+// ✅ Inicia o servidor
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando na porta ${PORT}`);
-  // Executa o diagnóstico após o servidor iniciar
-  checkDatabase();
-});
+app.listen(PORT, () => console.log(`🚀 Servidor rodando na porta ${PORT}`));
