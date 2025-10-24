@@ -1,101 +1,116 @@
-import express from 'express';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import tokenService from './services/tokenService.js';
-import dotenv from 'dotenv';
-import axios from 'axios';
-import { URLSearchParams } from 'url'; // Import URLSearchParams
+import express from "express";
+import axios from "axios";
+import dotenv from "dotenv";
+import { saveToken, getAllTokens, getToken } from "./services/tokenService.js";
 
 dotenv.config();
-
 const app = express();
-const port = process.env.PORT || 10000;
+app.use(express.json());
+app.use(express.static("views"));
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const { CLIENT_ID, CLIENT_SECRET } = process.env;
+const AUTH_URL = "https://www.nuvemshop.com.br/apps/authorize/token";
 
-// This ensures express can parse URL-encoded bodies, which is good practice
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'views')));
+// ✅ Rota inicial (teste rápido)
+app.get("/", (req, res) => {
+  res.send("🚀 App Nuvemshop rodando!");
+});
 
+// ✅ Callback OAuth — troca o código pelo token e salva no banco
+app.get("/oauth/callback", async (req, res) => {
+  console.log("🔄 Callback recebido:", req.query);
+  const { code } = req.query;
 
-// Rota para o callback da Nuvemshop - Este é o fluxo principal
-app.get('/oauth/callback', (req, res) => {
-    const { code } = req.query;
-
-    if (!code) {
-        console.error('Callback recebido sem o código de autorização.');
-        return res.status(400).send('Código de autorização ausente.');
-    }
-
-    const authUrl = `https://www.nuvemshop.com.br/apps/authorize/token`;
-
-    // A API da Nuvemshop espera os dados como 'application/x-www-form-urlencoded'
-    const params = new URLSearchParams();
-    params.append('grant_type', 'authorization_code');
-    params.append('client_id', process.env.CLIENT_ID);
-    params.append('client_secret', process.env.CLIENT_SECRET);
-    params.append('code', code);
-
-    axios.post(authUrl, params, {
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-        }
-    })
-    .then(response => {
-        const { access_token, user_id } = response.data; // user_id é o store_id
-        tokenService.saveToken(user_id, access_token);
-        console.log(`Token salvo com sucesso para a loja: ${user_id}`);
-        // Redireciona para o painel de controle que mostrará o token
-        res.redirect('/dashboard');
-    })
-    .catch(error => {
-        // Log detalhado do erro para depuração
-        console.error('--- ERRO AO OBTER TOKEN DE ACESSO ---');
-        if (error.response) {
-            // A requisição foi feita e o servidor respondeu com um status de erro
-            console.error('Data:', error.response.data);
-            console.error('Status:', error.response.status);
-            console.error('Headers:', error.response.headers);
-        } else if (error.request) {
-            // A requisição foi feita mas nenhuma resposta foi recebida
-            console.error('Request:', error.request);
-        } else {
-            // Algo aconteceu ao configurar a requisição que acionou um erro
-            console.error('Error Message:', error.message);
-        }
-        console.error('Config:', error.config);
-        console.error('--- FIM DO ERRO ---');
-        res.status(500).send('Ocorreu um erro ao autenticar a loja. Verifique os logs do servidor.');
+  try {
+    const tokenRes = await axios.post(AUTH_URL, {
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+      grant_type: "authorization_code",
+      code,
     });
-});
 
+    const data = tokenRes.data;
+    console.log("🔐 Token recebido:", data);
 
-// Rota para exibir o painel de controle
-app.get('/dashboard', (req, res) => {
-    res.sendFile(path.join(__dirname, 'views', 'dashboard.html'));
-});
-
-// Rota para obter todos os tokens salvos (para o dashboard)
-app.get('/tokens', (req, res) => {
-    try {
-        const tokens = tokenService.getAllTokens();
-        res.json(tokens);
-    } catch (error) {
-        console.error('Erro ao ler tokens:', error);
-        res.status(500).json({ error: 'Falha ao ler tokens' });
+    if (!data.access_token || !data.user_id) {
+      return res.status(400).send("❌ Falha ao obter token da Nuvemshop");
     }
+
+    await saveToken(data.user_id, data);
+
+    res.send(`
+      <h2>✅ App conectado com sucesso!</h2>
+      <p>Loja: ${data.user_id}</p>
+      <pre>${JSON.stringify(data, null, 2)}</pre>
+      <a href="/dashboard">Acessar painel</a>
+    `);
+  } catch (err) {
+    console.error("🔥 Erro no callback:", err.response?.data || err.message);
+    res.status(500).send("Ocorreu um erro ao autenticar a loja.");
+  }
 });
 
-// Rota de fallback para qualquer outra coisa, apenas para garantir que o servidor não quebre
-app.get('*', (req, res) => {
-  res.send('Rota não encontrada.');
+// ✅ Painel visual
+app.get("/dashboard", (req, res) => {
+  res.sendFile(process.cwd() + "/views/dashboard.html");
 });
 
-
-// Inicia o servidor
-app.listen(port, () => {
-    console.log(`Servidor rodando na porta ${port}`);
-    console.log(`Seu serviço está no ar`);
-    console.log(`Disponível em seu URL principal https://nuvem-app1.onrender.com`);
+// ✅ Endpoint para listar tokens salvos
+app.get("/tokens", async (req, res) => {
+  const tokens = await getAllTokens();
+  res.json(tokens);
 });
+
+// ✅ Teste de API — busca produtos da loja
+app.get("/test-api/:userId", async (req, res) => {
+  const { userId } = req.params;
+  const token = await getToken(userId);
+
+  if (!token) return res.status(404).send("Token não encontrado para esta loja.");
+
+  try {
+    const resp = await axios.get(
+      `https://api.nuvemshop.com.br/v1/${userId}/products`,
+      {
+        headers: {
+          "Authentication": `bearer ${token.access_token}`,
+          "User-Agent": "LayoutApp (contato@dcriar.com.br)",
+        },
+      }
+    );
+
+    res.json(resp.data);
+  } catch (err) {
+    console.error("❌ Erro ao chamar API:", err.response?.data || err.message);
+    res.status(500).send("Erro ao acessar API da Nuvemshop.");
+  }
+});
+
+// ✅ Atualização de token (refresh)
+app.post("/refresh/:userId", async (req, res) => {
+  const { userId } = req.params;
+  const token = await getToken(userId);
+
+  if (!token?.refresh_token) {
+    return res.status(400).send("Loja sem refresh_token salvo.");
+  }
+
+  try {
+    const resp = await axios.post(AUTH_URL, {
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+      grant_type: "refresh_token",
+      refresh_token: token.refresh_token,
+    });
+
+    await saveToken(userId, resp.data);
+    res.send("🔄 Token atualizado com sucesso!");
+  } catch (err) {
+    console.error("Erro no refresh:", err.response?.data || err.message);
+    res.status(500).send("Falha ao atualizar o token.");
+  }
+});
+
+// ✅ Inicia o servidor
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => console.log(`🚀 Servidor rodando na porta ${PORT}`));
