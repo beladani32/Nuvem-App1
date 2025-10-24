@@ -3,10 +3,10 @@ const { Pool } = pg;
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }, // Necessário para conexões com o Render
+  ssl: { rejectUnauthorized: false },
 });
 
-// Cria a tabela 'tokens' automaticamente se ela não existir
+// 🔹 Cria tabela automaticamente se não existir
 (async () => {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS tokens (
@@ -18,7 +18,6 @@ const pool = new Pool({
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
-  console.log('✅ Tabela "tokens" verificada/criada com sucesso');
 })();
 
 export async function saveToken(userId, tokenData) {
