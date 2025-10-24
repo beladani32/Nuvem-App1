@@ -1,7 +1,7 @@
 import express from "express";
 import axios from "axios";
 import dotenv from "dotenv";
-import { saveToken, getAllTokens, getToken } from "./services/tokenService.js";
+import tokenService from "./services/tokenService.js"; // Alterado para import default
 
 dotenv.config();
 const app = express();
@@ -36,7 +36,7 @@ app.get("/oauth/callback", async (req, res) => {
       return res.status(400).send("❌ Falha ao obter token da Nuvemshop");
     }
 
-    await saveToken(data.user_id, data);
+    await tokenService.saveToken(data.user_id, data);
 
     res.send(`
       <h2>✅ App conectado com sucesso!</h2>
@@ -57,14 +57,14 @@ app.get("/dashboard", (req, res) => {
 
 // ✅ Endpoint para listar tokens salvos
 app.get("/tokens", async (req, res) => {
-  const tokens = await getAllTokens();
+  const tokens = await tokenService.getAllTokens();
   res.json(tokens);
 });
 
 // ✅ Teste de API — busca produtos da loja
 app.get("/test-api/:userId", async (req, res) => {
   const { userId } = req.params;
-  const token = await getToken(userId);
+  const token = await tokenService.getToken(userId);
 
   if (!token) return res.status(404).send("Token não encontrado para esta loja.");
 
@@ -89,7 +89,7 @@ app.get("/test-api/:userId", async (req, res) => {
 // ✅ Atualização de token (refresh)
 app.post("/refresh/:userId", async (req, res) => {
   const { userId } = req.params;
-  const token = await getToken(userId);
+  const token = await tokenService.getToken(userId);
 
   if (!token?.refresh_token) {
     return res.status(400).send("Loja sem refresh_token salvo.");
@@ -103,7 +103,7 @@ app.post("/refresh/:userId", async (req, res) => {
       refresh_token: token.refresh_token,
     });
 
-    await saveToken(userId, resp.data);
+    await tokenService.saveToken(userId, resp.data);
     res.send("🔄 Token atualizado com sucesso!");
   } catch (err) {
     console.error("Erro no refresh:", err.response?.data || err.message);
